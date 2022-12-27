@@ -57,8 +57,8 @@ static void MX_ADC1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-	uint32_t buffer_ADC[2];
-	uint32_t valor_analogico[2];
+	uint32_t buffer_ADC[3];
+	uint32_t valor_analogico[3];
 
 	HAL_ADC_ConvCpltCallback (ADC_HandleTypeDef * hadc)
 	{
@@ -66,6 +66,7 @@ static void MX_ADC1_Init(void);
 		{
 			valor_analogico[0]=buffer_ADC[0];
 			valor_analogico[1]=buffer_ADC[1];
+			valor_analogico[2]=buffer_ADC[2];
 		}
 
 	}
@@ -102,7 +103,7 @@ int main(void)
   MX_DMA_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
-  HAL_ADC_Start_DMA(&hadc1, buffer_ADC, 2);
+  HAL_ADC_Start_DMA(&hadc1, buffer_ADC, 3);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -191,7 +192,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 2;
+  hadc1.Init.NbrOfConversion = 3;
   hadc1.Init.DMAContinuousRequests = ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
@@ -213,6 +214,15 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_3;
   sConfig.Rank = 2;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_6;
+  sConfig.Rank = 3;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
