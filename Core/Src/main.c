@@ -165,7 +165,7 @@ int main(void)
 
 	  }
 
-	  if(estados == 0)
+	  if(estados == 0)	//Modo iluminacion ambiente
 	  {
 
 		  if(valor_analogico[0] < valor_analogico[1])
