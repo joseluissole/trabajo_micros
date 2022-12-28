@@ -31,6 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define N_ESTADOS 3 //0 iluminacion 1 manual 2 retardo
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -57,8 +58,46 @@ static void MX_ADC1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+//ANTIRREBOTES
+/*Returns true when the button has been pressed after debounce period*/
+int debouncer(volatile int* button_int, GPIO_TypeDef* GPIO_port, uint16_t GPIO_number){
+	static uint8_t button_count=0;
+	static int counter=0;
+
+	if (*button_int==1){
+		if (button_count==0) {
+			counter=HAL_GetTick();
+			button_count++;
+		}
+		if (HAL_GetTick()-counter>=20){
+			counter=HAL_GetTick();
+			if (HAL_GPIO_ReadPin(GPIO_port, GPIO_number)!=1){
+				button_count=1;
+			}
+			else{
+				button_count++;
+			}
+			if (button_count==4){ //Periodo antirebotes
+				button_count=0;
+				*button_int=0;
+				return 1;
+			}
+		}
+	}
+	return 0;
+}
+
+	volatile uint32_t estados = 0;	//0 iluminacion 1 manual 2 retardo
+	volatile uint32_t boton0_pulsado = 0;
+
 	uint32_t buffer_ADC[2];
 	uint32_t valor_analogico[2];
+
+	HAL_GPIO_EXTI_Callback(uint16_t  GPIO_Pin)
+	{
+		if(GPIO_Pin == GPIO_PIN_0) boton0_pulsado = 1;
+	}
 
 	HAL_ADC_ConvCpltCallback (ADC_HandleTypeDef * hadc)
 	{
@@ -102,17 +141,40 @@ int main(void)
   MX_DMA_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
-  HAL_ADC_Start_DMA(&hadc1, buffer_ADC, 2);
+
+  HAL_ADC_Start_DMA(&hadc1, buffer_ADC, 2); //Arranca el dma para el estado 0
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  if(valor_analogico[0] < valor_analogico[1])
-		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, 1);
-	  else
-		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, 0);
+	  //estados
+	  //0 iluminacion natural
+	  //1 manual
+	  //2 retardo
+	  if(debouncer(&boton0_pulsado, GPIOA, GPIO_PIN_0))
+	  {
+		  estados = (estados + 1) % N_ESTADOS;
+
+
+		  if (estados == 0)
+			  HAL_ADC_Start_DMA(&hadc1, buffer_ADC, 2);
+		  else
+			  HAL_ADC_Stop_DMA(&hadc1);
+
+	  }
+
+	  if(estados == 0)
+	  {
+
+		  if(valor_analogico[0] < valor_analogico[1])
+			  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, 1);
+		  else
+			  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, 0);
+	  }
+
+
 
     /* USER CODE END WHILE */
 
@@ -260,12 +322,22 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin : PA0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
   /*Configure GPIO pin : PD15 */
   GPIO_InitStruct.Pin = GPIO_PIN_15;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 
 }
 
