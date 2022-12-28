@@ -168,7 +168,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   HAL_ADC_Start_DMA(&hadc1, buffer_ADC, 2); //Arranca el dma para el estado 0
-  HAL_NVIC_DisableIRQ(EXTI4_IRQn);			//arranca el estado 0 y deshabilita boton
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -184,19 +184,7 @@ int main(void)
 	  {
 
 		  estados = (estados + 1) % N_ESTADOS;
-
-
-		  if (estados == 0)
-			  HAL_ADC_Start_DMA(&hadc1, buffer_ADC, 2);
-
-
-
-		  if(estados != 0)
-			  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
-		  else
-			  HAL_NVIC_DisableIRQ(EXTI4_IRQn);
-
-
+		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, 0);
 
 
 	  }
@@ -205,10 +193,12 @@ int main(void)
 	  if(estados == 0)	//Modo iluminacion ambiente
 	  {
 
+		  __disable_irq();
 		  if(valor_analogico[0] < valor_analogico[1])
 			  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, 1);
 		  else
 			  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, 0);
+		  __enable_irq();
 	  }
 
 	  else if (estados == 1)
