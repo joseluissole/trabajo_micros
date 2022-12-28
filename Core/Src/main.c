@@ -70,7 +70,7 @@ int debouncer(volatile int* button_int, GPIO_TypeDef* GPIO_port, uint16_t GPIO_n
 			counter=HAL_GetTick();
 			button_count++;
 		}
-		if (HAL_GetTick()-counter>=20){
+		if (HAL_GetTick()-counter>=15){
 			counter=HAL_GetTick();
 			if (HAL_GPIO_ReadPin(GPIO_port, GPIO_number)!=1){
 				button_count=1;
@@ -91,12 +91,22 @@ int debouncer(volatile int* button_int, GPIO_TypeDef* GPIO_port, uint16_t GPIO_n
 	volatile uint32_t estados = 0;	//0 iluminacion 1 manual 2 retardo
 	volatile uint32_t boton0_pulsado = 0;
 
+	volatile uint32_t boton4_pulsado = 0;
+
 	uint32_t buffer_ADC[2];
 	uint32_t valor_analogico[2];
 
 	HAL_GPIO_EXTI_Callback(uint16_t  GPIO_Pin)
 	{
-		if(GPIO_Pin == GPIO_PIN_0) boton0_pulsado = 1;
+		if(GPIO_Pin == GPIO_PIN_0)
+		{
+			boton0_pulsado = 1;
+
+		}
+
+
+		else if (GPIO_Pin == GPIO_PIN_4)
+			boton4_pulsado = 1;
 	}
 
 	HAL_ADC_ConvCpltCallback (ADC_HandleTypeDef * hadc)
@@ -143,6 +153,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   HAL_ADC_Start_DMA(&hadc1, buffer_ADC, 2); //Arranca el dma para el estado 0
+  HAL_NVIC_DisableIRQ(EXTI4_IRQn);			//arranca el estado 0 y deshabilita boton
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -153,17 +164,26 @@ int main(void)
 	  //0 iluminacion natural
 	  //1 manual
 	  //2 retardo
+	  __disable_irq();
 	  if(debouncer(&boton0_pulsado, GPIOA, GPIO_PIN_0))
 	  {
+
 		  estados = (estados + 1) % N_ESTADOS;
 
 
 		  if (estados == 0)
 			  HAL_ADC_Start_DMA(&hadc1, buffer_ADC, 2);
+
+
+
+		  if(estados != 0)
+			  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 		  else
-			  HAL_ADC_Stop_DMA(&hadc1);
+			  HAL_NVIC_DisableIRQ(EXTI4_IRQn);
+
 
 	  }
+	  __enable_irq();
 
 	  if(estados == 0)	//Modo iluminacion ambiente
 	  {
@@ -174,6 +194,15 @@ int main(void)
 			  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, 0);
 	  }
 
+	  else if (estados == 1)
+	  {
+		  __disable_irq();
+		  if(debouncer(&boton4_pulsado,GPIOA,GPIO_PIN_4))
+		  {
+			  HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_15);
+		  }
+		  __enable_irq();
+	  }
 
 
     /* USER CODE END WHILE */
@@ -322,8 +351,8 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : PA0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  /*Configure GPIO pins : PA0 PA4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_4;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -338,6 +367,9 @@ static void MX_GPIO_Init(void)
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 
 }
 
