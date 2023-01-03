@@ -31,7 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define N_ESTADOS 4 //0 iluminacion 1 manual 2 retardo 3 intensidad variada
+#define N_ESTADOS 4 //0 iluminacion 1 manual 2 retardo 3 parpadeo
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -91,7 +91,7 @@ int debouncer(volatile int* button_int, GPIO_TypeDef* GPIO_port, uint16_t GPIO_n
 	return 0;
 }
 
-	volatile uint32_t estados = 0;	//0 iluminacion 1 manual 2 retardo 3 intensidad variada
+	volatile uint32_t estados = 0;	//0 iluminacion 1 manual 2 retardo 3 parpadeo
 	volatile uint32_t boton0_pulsado = 0;
 
 	volatile uint32_t boton4_pulsado = 0;
@@ -192,7 +192,6 @@ int main(void)
 		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, 0);
 		  contador_modo_3 = 0;
 
-
 	  }
 	  __enable_irq();
 
@@ -227,10 +226,10 @@ int main(void)
 		  }
 		  __enable_irq();
 	  }
-	  else if (estados == 3)	//modo de intensidad variada, variar la intensidad de iluminación cuando pulsa el botón PD4
+	  else if (estados == 3)	//modo parpadeo
 	  {
 		  __disable_irq();
-		  if(debouncer(&boton0_pulsado,GPIOA,GPIO_PIN_4))
+		  if(debouncer(&boton4_pulsado,GPIOA,GPIO_PIN_4))
 		  {
 		  	  contador_modo_3 ++;
 		  	  if(contador_modo_3 > 4 )
@@ -242,10 +241,10 @@ int main(void)
 		  switch(contador_modo_3)
 		  {
 		  	  case 0:  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0); break;
-		  	  case 1:  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 20); break;
-		  	  case 2:  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 50); break;
-		  	  case 3:  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 100); break;
-		  	  case 4:  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 200); break;
+		  	  case 1:  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 1000); break;
+		  	  case 2:  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 2500); break;
+		  	  case 3:  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 5000); break;
+		  	  case 4:  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 10000); break;
 
 		  }
 		  __enable_irq();
