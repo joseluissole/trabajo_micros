@@ -31,7 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define N_ESTADOS 3 //0 iluminacion 1 manual 2 retardo
+#define N_ESTADOS 4 //0 iluminacion 1 manual 2 retardo 3 parpadeo
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -91,13 +91,15 @@ int debouncer(volatile int* button_int, GPIO_TypeDef* GPIO_port, uint16_t GPIO_n
 	return 0;
 }
 
-	volatile uint32_t estados = 0;	//0 iluminacion 1 manual 2 retardo
+	volatile uint32_t estados = 0;	//0 iluminacion 1 manual 2 retardo 3 parpadeo
 	volatile uint32_t boton0_pulsado = 0;
 
 	volatile uint32_t boton4_pulsado = 0;
 
 	uint32_t buffer_ADC[2];
 	uint32_t valor_analogico[2];
+
+	uint8_t contador_modo_3 = 0;
 
 	HAL_GPIO_EXTI_Callback(uint16_t  GPIO_Pin)
 	{
@@ -168,7 +170,9 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   HAL_ADC_Start_DMA(&hadc1, buffer_ADC, 2); //Arranca el dma para el estado 0
-  HAL_NVIC_DisableIRQ(EXTI4_IRQn);			//arranca el estado 0 y deshabilita boton
+
+  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3); //Iniciar PWM para modo 3
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -179,25 +183,14 @@ int main(void)
 	  //0 iluminacion natural
 	  //1 manual
 	  //2 retardo
+	  //3 intensidad variadad
 	  __disable_irq();
 	  if(debouncer(&boton0_pulsado, GPIOA, GPIO_PIN_0))
 	  {
 
 		  estados = (estados + 1) % N_ESTADOS;
-
-
-		  if (estados == 0)
-			  HAL_ADC_Start_DMA(&hadc1, buffer_ADC, 2);
-
-
-
-		  if(estados != 0)
-			  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
-		  else
-			  HAL_NVIC_DisableIRQ(EXTI4_IRQn);
-
-
-
+		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, 0);
+		  contador_modo_3 = 0;
 
 	  }
 	  __enable_irq();
@@ -205,10 +198,12 @@ int main(void)
 	  if(estados == 0)	//Modo iluminacion ambiente
 	  {
 
+		  __disable_irq();
 		  if(valor_analogico[0] < valor_analogico[1])
 			  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, 1);
 		  else
 			  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, 0);
+		  __enable_irq();
 	  }
 
 	  else if (estados == 1)
@@ -231,10 +226,29 @@ int main(void)
 		  }
 		  __enable_irq();
 	  }
+	  else if (estados == 3)	//modo parpadeo
+	  {
+		  __disable_irq();
+		  if(debouncer(&boton4_pulsado,GPIOA,GPIO_PIN_4))
+		  {
+		  	  contador_modo_3 ++;
+		  	  if(contador_modo_3 > 4 )
+		 	  {
+		  	 	  contador_modo_3 = 0;
+		  	  }
 
+		  }
+		  switch(contador_modo_3)
+		  {
+		  	  case 0:  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0); break;
+		  	  case 1:  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 1000); break;
+		  	  case 2:  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 2500); break;
+		  	  case 3:  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 5000); break;
+		  	  case 4:  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 10000); break;
 
-    /* USER CODE END WHILE */
-
+		  }
+		  __enable_irq();
+	  }
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -360,6 +374,7 @@ static void MX_TIM4_Init(void)
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
 
   /* USER CODE BEGIN TIM4_Init 1 */
 
@@ -379,15 +394,28 @@ static void MX_TIM4_Init(void)
   {
     Error_Handler();
   }
+  if (HAL_TIM_PWM_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE BEGIN TIM4_Init 2 */
 
   /* USER CODE END TIM4_Init 2 */
+  HAL_TIM_MspPostInit(&htim4);
 
 }
 
